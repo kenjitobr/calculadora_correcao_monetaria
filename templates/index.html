@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Correção Monetária</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Calculadora de Correção Monetária</h1>
+        <div class="form-group">
+            <label for="initialDate">Data Inicial:</label>
+            <input type="date" id="initialDate" required>
+        </div>
+        <div class="form-group">
+            <label for="finalDate">Data Final:</label>
+            <input type="date" id="finalDate" required>
+        </div>
+        <div class="form-group">
+            <label for="indexType">Índice:</label>
+            <select id="indexType" required>
+                <option value="IPCA">IPCA (IBGE)</option>
+                <option value="IGPM">IGP-M (FGV)</option>
+                </select>
+        </div>
+        <div class="form-group">
+            <label for="finalMonetaryValue">Valor Final (R$):</label>
+            <input type="number" id="finalMonetaryValue" step="0.01" min="0" required>
+        </div>
+        <button onclick="calculateValue()">Calcular Valor Inicial</button>
+        <div class="result" id="result">
+            Valor Inicial: R$ 0.00
+        </div>
+        <div class="error-message" id="errorMessage"></div>
+        <div id="calculationTable" class="table-container"></div> 
+    </div>
+
+    <script>
+        async function calculateValue() {
+            const initialDate = document.getElementById('initialDate').value;
+            const finalDate = document.getElementById('finalDate').value;
+            const indexType = document.getElementById('indexType').value;
+            const finalMonetaryValue = document.getElementById('finalMonetaryValue').value;
+            const resultDiv = document.getElementById('result');
+            const errorDiv = document.getElementById('errorMessage');
+            const tableDiv = document.getElementById('calculationTable'); 
+
+            errorDiv.textContent = ''; // Clear previous errors
+            resultDiv.textContent = 'Valor Inicial: Calculando...';
+            tableDiv.innerHTML = ''; // Clear previous table
+
+            if (!initialDate || !finalDate || !finalMonetaryValue) {
+                errorDiv.textContent = 'Por favor preencha todos os campos.';
+                resultDiv.textContent = 'Valor Inicial: R$ 0.00';
+                return;
+            }
+
+            const initialDateObj = new Date(initialDate);
+            const finalDateObj = new Date(finalDate);
+
+            if (initialDateObj >= finalDateObj) {
+                errorDiv.textContent = 'Data Inicial deve ser anterior à Data Final.';
+                resultDiv.textContent = 'Valor Inicial: R$ 0.00';
+                return;
+            }
+
+            try {
+                const response = await fetch('/calculate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        initialDate,
+                        finalDate,
+                        indexType,
+                        finalMonetaryValue
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    resultDiv.textContent = `Valor Inicial: R$ ${data.initialMonetaryValue}`;
+                    
+                    let tableHTML = '<table><thead><tr><th>Mês</th><th>Índice (%)</th><th>Valor Corrigido (R$)</th></tr></thead><tbody>';
+                    data.calculationSteps.forEach(step => {
+                        tableHTML += `<tr><td>${step.month}</td><td>${step.rate}</td><td>${step.value}</td></tr>`;
+                    });
+                    tableHTML += '</tbody></table>';
+                    tableDiv.innerHTML = tableHTML;
+                } else {
+                    errorDiv.textContent = data.error || 'An unknown error occurred.';
+                    resultDiv.textContent = 'Valor Inicial: R$ 0.00';
+                }
+            } catch (error) {
+                console.error('Error during fetch:', error);
+                errorDiv.textContent = 'Network error or server unavailable.';
+                resultDiv.textContent = 'Valor Inicial: R$ 0.00';
+            }
+        }
+    </script>
+</body>
+</html>
